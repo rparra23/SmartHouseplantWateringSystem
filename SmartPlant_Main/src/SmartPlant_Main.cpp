@@ -18,6 +18,7 @@
 #include <Adafruit_MQTT.h>
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
 #include "Adafruit_MQTT/Adafruit_MQTT.h"
+#include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
 #include "credentials.h"
 
@@ -66,6 +67,7 @@ float concentration = 0;
 int moistSensor = A1;
 int moistValue;
 float subValue;
+unsigned long waterTime = 60000; //Sample 30 Seconds
 
 //***** Setting Water Pump Integers *****/
 int waterPump = D16;
@@ -104,7 +106,7 @@ SYSTEM_MODE(AUTOMATIC);
 
         //Setting OLED DISPLAY Parameters
         display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-        display.clearDisplay();
+        display.display();
         display.setTextSize(1);
         display.setTextColor(WHITE);
         display.setCursor(0, 0);
@@ -144,6 +146,7 @@ SYSTEM_MODE(AUTOMATIC);
         Temperature_Sesnor ();
         MQTT_connect();
         MQTT_ping();
+    
     }
 
 
@@ -151,10 +154,11 @@ SYSTEM_MODE(AUTOMATIC);
 
     void Time_Keeper () {
         //Implementing Time in OLED
+
         DateTime = Time.timeStr();    //Current Date and Time from Particle Time Class
         TimeOnly = DateTime.substring(11,19); //Extract the time from the DateTime String
         DateOnly = DateTime.substring(0,10); //Extracts the date from the DateTIme
-            delay(10000);
+            //delay(10000);
         //%s prints an array of char
         //the .c_str() method converts a String to an array of char
         
@@ -175,9 +179,11 @@ SYSTEM_MODE(AUTOMATIC);
         lowPulseOccupancy = 0;
 
         
-
+        if ((millis()-startTime)> sampleTime) // if the sample time == 30s
+        {
         //******** ADAFRUIT CODE ********
         dqNumbers.publish(ratio);
+        }
         }
     }
 
@@ -196,8 +202,11 @@ SYSTEM_MODE(AUTOMATIC);
             else if (current_quality == 3)
                 Serial.println("Fresh air\n");
 
+             if ((millis()-startTime)> sampleTime) // if the sample time == 30s
+            {
             //******** ADAFRUIT CODE ********
             aqNumbers.publish(current_quality);
+            }
             }
     }
 
@@ -209,10 +218,13 @@ SYSTEM_MODE(AUTOMATIC);
         //***** ADAFRUIT PUBLISH *****/
         msNumbers.publish(moistValue);
 
+        if ((millis()-startTime)> waterTime) // if the sample time == 30s
+        {
         if (moistValue >= 3350){
             digitalWrite(waterPump ,HIGH);
             delay(500);
             digitalWrite(waterPump,LOW);
+        }
         }
 
         // this is our 'wait for incoming subscription packets' busy subloop 
@@ -240,10 +252,12 @@ SYSTEM_MODE(AUTOMATIC);
         Serial.printf("Pressure: %.2f inHg\n", pressInHg);
         Serial.printf("Humidity: %.2f %%\n", humidRH);
 
+    
         //***** ADAFRUIT PUBLISH *****/
         tsNumbers.publish(tempF);
         psNumbers.publish(pressInHg);
         huNumbers.publish(humidRH);
+    
 
         OLED_Display_Information (tempF, pressInHg, humidRH);
 
@@ -251,8 +265,9 @@ SYSTEM_MODE(AUTOMATIC);
 
     void OLED_Display_Information (float tempF, float pressInHg, float humidRH) {
         //***** Displaying Information on OLED Screen *****/
-        int currentOLED;
-            if((millis()- millis())>2000){
+        static unsigned int screenFlipTime;
+        static int currentOLED;
+            if((millis()- screenFlipTime ) > 2000) {
                 currentOLED++;
 
                 if(currentOLED>2){
@@ -261,33 +276,33 @@ SYSTEM_MODE(AUTOMATIC);
                 switch(currentOLED){
                     case 0:
                     display.clearDisplay();
-                    display.setTextSize(1);
+                    display.setTextSize(2);
                     display.setTextColor(WHITE);
                     display.setCursor(0,5);
-                    display.printf("Temperature:\n  %0.1f%c",tempF);
+                    display.printf("Temp: \n  %0.1f%c",tempF);
                     display.setCursor(0,40);
                     display.display();
                     break;
                     case 1:
                     display.clearDisplay();
-                    display.setTextSize(1);
+                    display.setTextSize(2);
                     display.setTextColor(WHITE);
                     display.setCursor(0,5);
-                    display.printf("Pressure: %0.1f\n", pressInHg);
+                    display.printf("Pressure: \n %0.1f", pressInHg);
                     display.setCursor(0,40);
                     display.display();
                     break;
                     case 2:
                     display.clearDisplay();
-                    display.setTextSize(1);
+                    display.setTextSize(2);
                     display.setTextColor(WHITE);
                     display.setCursor(0,5);
-                    display.printf("Humidity: %i%c\n",humidRH);
+                    display.printf("Humidity: \n %0.1f%c",humidRH);
                     display.setCursor(0,40);
                     display.display();
                     break;
                     }
-                //screenFlipTime = millis();
+                screenFlipTime = millis();
                 }
     }
 
